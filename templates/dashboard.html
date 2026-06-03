@@ -24,7 +24,28 @@ Add Password
     {{ item[2] }}
 
 </div>
+{% for item in passwords %}
 
+<div>
+
+    <strong>{{ item[1] }}</strong>
+
+    <br>
+
+    Username:
+    {{ item[2] }}
+
+    <br><br>
+
+    <a href="/view-password/{{ item[0] }}">
+        View Password
+    </a>
+
+</div>
+
+<hr>
+
+{% endfor %}
 <hr>
 
 {% endfor %}
