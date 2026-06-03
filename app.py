@@ -1,3 +1,5 @@
+from crypto_utils import encrypt_password
+from crypto_utils import decrypt_password
 from flask import (
     Flask,
     render_template,
@@ -120,6 +122,43 @@ def dashboard():
         "dashboard.html",
         passwords=passwords
     )
+@app.route("/view-password/<int:id>")
+def view_password(id):
+
+    if "user_id" not in session:
+        return redirect("/")
+
+    conn = sqlite3.connect("database.db")
+    cursor = conn.cursor()
+
+    cursor.execute(
+    """
+    SELECT website,
+           site_username,
+           site_password
+    FROM vault
+    WHERE id = ?
+    AND user_id = ?
+    """,
+    (id, session["user_id"])
+)
+
+    record = cursor.fetchone()
+
+    conn.close()
+
+    if not record:
+        return "Password not found"
+    print(record)
+    print(type(record[2]))
+    decrypted_password = decrypt_password(record[2])
+
+    return f"""
+    <h2>{record[0]}</h2>
+    Username: {record[1]}<br><br>
+    Password: {decrypted_password}<br><br>
+    <a href='/dashboard'>Back</a>
+    """
 @app.route("/logout")
 def logout():
 
@@ -137,7 +176,7 @@ def add_password():
         website = request.form["website"]
         site_username = request.form["site_username"]
         site_password = request.form["site_password"]
-
+        encrypted_password = encrypt_password(site_password)
         conn = sqlite3.connect("database.db")
         cursor = conn.cursor()
 
@@ -150,7 +189,7 @@ def add_password():
             (
                 website,
                 site_username,
-                site_password,
+                encrypted_password,
                 session["user_id"]
             )
         )
