@@ -63,16 +63,12 @@
                 Add Password
 
             </a>
-
+<a href="/security-center">
+    Security Center
+</a>
             <a href="/generate-password">
 
                 Generator
-
-            </a>
-
-            <a href="#">
-
-                Security Center
 
             </a>
 
@@ -130,7 +126,7 @@
     </div>
 
     <div class="score">
-        92%
+        {{ security_score }}%
     </div>
 
 </section>
@@ -243,24 +239,6 @@
     </div>
 
 </div>
-
-                <div class="actions">
-
-                    <a href="/view-password/{{ item[0] }}">
-                        View
-                    </a>
-
-                    <a href="/edit-password/{{ item[0] }}">
-                        Edit
-                    </a>
-
-                    <a href="/delete-password/{{ item[0] }}">
-                        Delete
-                    </a>
-
-                </div>
-
-            </div>
 
             {% endfor %}
 

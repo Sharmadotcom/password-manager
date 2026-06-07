@@ -26,15 +26,15 @@ def get_password_score(password):
     score = 0
     if len(password) >= 8:
         score += 1
-    if any(c.isupper() for c in password):
-        score += 1
-    if any(c.islower() for c in password):
-        score += 1
-    if any(c.isdigit() for c in password):
-        score += 1
-    if any(not c.isalnum() for c in password):
-        score += 1
-    return score
+        if any(c.isupper() for c in password):
+            score += 1
+            if any(c.islower() for c in password):
+                score += 1
+                if any(c.isdigit() for c in password):
+                    score += 1
+                    if any(not c.isalnum() for c in password):
+                        score += 1
+                        return score
 
 
 def calculate_security_score(user_id):
@@ -67,16 +67,16 @@ def calculate_security_score(user_id):
         else:
             strong += 1
 
-    total = weak + medium + strong
+            total = weak + medium + strong
 
-    if total == 0:
-        return 100, 0, 0, 0, 0, 0
+            if total == 0:
+                return 100, 0, 0, 0, 0, 0
 
-    reused_passwords = sum(1 for count in password_map.values() if count > 1)
-    base_score = round((strong * 100 + medium * 70 + weak * 30) / total)
-    security_score = max(0, base_score - (reused_passwords * 10))
+            reused_passwords = sum(1 for count in password_map.values() if count > 1)
+            base_score = round((strong * 100 + medium * 70 + weak * 30) / total)
+            security_score = max(0, base_score - (reused_passwords * 10))
 
-    return security_score, total, weak, medium, strong, reused_passwords
+            return security_score, total, weak, medium, strong, reused_passwords
 
 
 @app.route("/", methods=["GET", "POST"])
