@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -203,40 +203,40 @@
         <!-- Stats -->
         <section class="stats">
 
-            <div class="glass-card">
+            <a href="/dashboard" class="glass-card" style="text-decoration: none; color: inherit; display: block;">
                 <h2>{{ total }}</h2>
                 <span>Total Passwords</span>
-            </div>
+            </a>
 
-            <div class="glass-card">
+            <a href="/dashboard?strength=strong" class="glass-card" style="text-decoration: none; color: inherit; display: block;">
                 <h2>{{ strong }}</h2>
                 <span>Strong Passwords</span>
-            </div>
+            </a>
 
-            <div class="glass-card">
+            <a href="/dashboard?strength=medium" class="glass-card" style="text-decoration: none; color: inherit; display: block;">
                 <h2>{{ medium }}</h2>
                 <span>Medium Passwords</span>
-            </div>
+            </a>
 
-            <div class="glass-card">
+            <a href="/dashboard?strength=weak" class="glass-card" style="text-decoration: none; color: inherit; display: block;">
                 <h2>{{ weak }}</h2>
                 <span>Weak Passwords</span>
-            </div>
+            </a>
 
-            <div class="glass-card">
+            <a href="/dashboard?filter=reused" class="glass-card" style="text-decoration: none; color: inherit; display: block;">
                 <h2>{{ reused_passwords }}</h2>
                 <span>Reused Passwords</span>
-            </div>
+            </a>
 
-            <div class="glass-card age-warn-card">
+            <a href="/dashboard?filter=stale" class="glass-card age-warn-card" style="text-decoration: none; color: inherit; display: block;">
                 <h2>{{ stale }}</h2>
                 <span>Stale (90d+)</span>
-            </div>
+            </a>
 
-            <div class="glass-card age-critical-card">
+            <a href="/dashboard?filter=overdue" class="glass-card age-critical-card" style="text-decoration: none; color: inherit; display: block;">
                 <h2>{{ overdue }}</h2>
                 <span>Overdue (180d+)</span>
-            </div>
+            </a>
 
         </section>
 
