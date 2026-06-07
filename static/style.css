@@ -1,4 +1,4 @@
-﻿@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
 *{
     margin:0;
@@ -345,12 +345,10 @@ form input::placeholder{
 }
 
 .password-header{
-
     display:flex;
-
     align-items:center;
-
     gap:18px;
+    min-width:0;
 }
 
 .site-icon{
@@ -1180,7 +1178,9 @@ input[type="range"]{
 .topbar-profile .profile-dropdown {
     position: absolute;
     top: calc(100% + 10px);
+    bottom: auto;
     right: 0;
+    left: auto;
     min-width: 220px;
     background: #111827;
     border: 1px solid rgba(255,255,255,.1);
@@ -1305,4 +1305,19 @@ input:checked + .slider:before {
 
 .topbar-profile .profile-name-label {
     margin-bottom: 2px;
+}
+
+.password-details {
+    min-width: 0;
+    overflow: hidden;
+}
+
+.password-details h3, .password-details p {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.password-card {
+    min-width: 0;
 }

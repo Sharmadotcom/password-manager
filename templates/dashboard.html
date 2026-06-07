@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -181,26 +181,38 @@
 
         </section>
 
-        <!-- SEARCH -->
+                <!-- SEARCH & BULK ACTIONS -->
+        <div style="display: flex; gap: 16px; margin-bottom: 24px;">
+            <form method="GET" action="/dashboard" class="search-form" style="margin-bottom: 0; flex: 1;">
+                <input type="text" name="search" placeholder="Search websites..." style="width: 100%;">
+            </form>
+            <button type="button" id="bulkDeleteBtn" onclick="submitBulkDelete()" style="padding: 0 20px; border-radius: 12px; background: rgba(239,68,68,0.15); color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); font-weight: 600; cursor: pointer; transition: all 0.2s; display: none;">
+                Delete Selected
+            </button>
+        </div>
 
-        <form method="GET"
-              action="/dashboard"
-              class="search-form">
-
-            <input
-                type="text"
-                name="search"
-                placeholder="Search websites...">
-
-        </form>
+        <script>
+        function updateBulkDeleteBtn() {
+            const checked = document.querySelectorAll('.bulk-cb:checked').length;
+            const btn = document.getElementById('bulkDeleteBtn');
+            btn.style.display = checked > 0 ? 'block' : 'none';
+            btn.textContent = "Delete Selected (" + checked + ")";
+        }
+        function submitBulkDelete() {
+            if(confirm('⚠️ Are you sure you want to delete these passwords? This cannot be undone.')) {
+                document.getElementById('bulkForm').submit();
+            }
+        }
+        </script>
 
         <!-- PASSWORDS -->
-
+        <form method="POST" action="/bulk-delete" id="bulkForm">
         <div class="password-grid">
 
             {% for item in passwords %}
 
-            <div class="password-card">
+                        <div class="password-card" style="position: relative; padding-left: 50px;">
+                <input type="checkbox" name="password_ids" value="{{ item.id }}" class="bulk-cb" onchange="updateBulkDeleteBtn()" style="position: absolute; left: 20px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; cursor: pointer; accent-color: #ef4444;">
 
     <div class="password-header">
 
@@ -235,10 +247,9 @@
     </div>
 
 </div>
-
             {% endfor %}
-
         </div>
+        </form>
 
     </main>
 
@@ -280,8 +291,9 @@ window.onload = () => {
             {{ message }}
             <button class="flash-dismiss" onclick="this.parentElement.style.animation='flashOut .3s forwards';setTimeout(()=>this.parentElement.remove(),300);">&times;</button>
         </div>
-        {% endfor %}
-    </div>
+            {% endfor %}
+        </div>
+        </form>
     {% endif %}
     {% endwith %}
     <script>
@@ -364,6 +376,7 @@ window.onload = () => {
 </body>
 
 </html>
+
 
 
 

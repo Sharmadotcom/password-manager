@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -278,6 +278,34 @@
 
             </div>
 
+            <!-- ── Section: Data Management ─────────── -->
+        <div class="profile-card">
+            <h2 style="margin-top:0; margin-bottom: 8px;">Data Management</h2>
+            <p style="color:#9ca3af; margin-bottom: 24px;">Import your existing vault from another password manager, or export a backup.</p>
+            
+            <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                
+                <div style="flex: 1; min-width: 280px; background: rgba(0,0,0,0.2); padding: 20px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.05);">
+                    <h3 style="margin-top: 0; font-size: 1.1rem; margin-bottom: 12px;">Export Vault</h3>
+                    <p style="color:#9ca3af; font-size: 0.85rem; margin-bottom: 16px;">Download all your passwords in unencrypted format.</p>
+                    <div style="display: flex; gap: 12px;">
+                        <a href="/export-vault?format=csv" style="flex: 1; text-align: center; text-decoration: none; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 10px; border-radius: 8px; font-weight: 600; font-size: 0.9rem;">Export CSV</a>
+                        <a href="/export-vault?format=json" style="flex: 1; text-align: center; text-decoration: none; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 10px; border-radius: 8px; font-weight: 600; font-size: 0.9rem;">Export JSON</a>
+                    </div>
+                </div>
+
+                <div style="flex: 1; min-width: 280px; background: rgba(0,0,0,0.2); padding: 20px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.05);">
+                    <h3 style="margin-top: 0; font-size: 1.1rem; margin-bottom: 12px;">Import Vault</h3>
+                    <p style="color:#9ca3af; font-size: 0.85rem; margin-bottom: 16px;">Upload a CSV or JSON backup. Passwords will be securely encrypted.</p>
+                    <form method="POST" action="/import-vault" enctype="multipart/form-data" style="margin: 0; display: flex; flex-direction: column; gap: 12px;">
+                        <input type="file" name="import_file" accept=".csv,.json" required style="font-size: 0.85rem; color: #9ca3af; background: rgba(255,255,255,0.03); padding: 8px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); width: 100%;">
+                        <button type="submit" class="auth-btn" style="width: 100%; padding: 10px; font-size: 0.9rem; border-radius: 8px; background: #6366f1; color: white; border: none; font-weight: 600; cursor: pointer;">Import Passwords</button>
+                    </form>
+                </div>
+
+            </div>
+        </div>
+
             <!-- ── Section 3: Delete Account ──────── -->
             <div class="danger-card">
 
@@ -471,5 +499,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 </body>
 </html>
+
+
 
 

@@ -10,7 +10,8 @@ from flask import (
     redirect,
     session,
     url_for,
-    flash
+    flash,
+    Response
 )
 import sqlite3
 from werkzeug.security import (
@@ -22,6 +23,9 @@ import qrcode
 import qrcode.image.svg
 import io
 import base64
+import csv
+import json
+import urllib.parse
 
 from database import init_db
 from hibp import check_pwned
@@ -116,9 +120,12 @@ def calculate_security_score(user_id):
     if total == 0:
         return 100, 0, 0, 0, 0, 0
 
-    reused_passwords = sum(1 for count in password_map.values() if count > 1)
+    reused_passwords = sum(count for count in password_map.values() if count > 1)
     base_score = round((strong * 100 + medium * 70 + weak * 30) / total)
-    security_score = max(0, base_score - (reused_passwords * 10))
+    
+    # Scale penalty based on proportion of reused passwords (max 40 point penalty)
+    reuse_penalty = min(40, (reused_passwords / max(1, total)) * 100)
+    security_score = int(max(0, base_score - reuse_penalty))
 
     return security_score, total, weak, medium, strong, reused_passwords
 
@@ -368,11 +375,13 @@ def dashboard():
     conn = sqlite3.connect("database.db")
     cursor = conn.cursor()
     search = request.args.get("search", "")
+    strength_filter = request.args.get("strength", "")
+    filter_type = request.args.get("filter", "")
 
     if search:
         cursor.execute(
             """
-            SELECT id, website, site_username, created_at
+            SELECT id, website, site_username, created_at, site_password
             FROM vault
             WHERE user_id = ? AND website LIKE ?
             """,
@@ -381,7 +390,7 @@ def dashboard():
     else:
         cursor.execute(
             """
-            SELECT id, website, site_username, created_at
+            SELECT id, website, site_username, created_at, site_password
             FROM vault
             WHERE user_id = ?
             """,
@@ -391,15 +400,44 @@ def dashboard():
     rows = cursor.fetchall()
     conn.close()
 
-    passwords = [
-        {
+    password_map = {}
+    decrypted_map = {}
+    for row in rows:
+        pw = decrypt_password(row[4])
+        decrypted_map[row[0]] = pw
+        if pw:
+            password_map[pw] = password_map.get(pw, 0) + 1
+
+    passwords = []
+    for row in rows:
+        pw = decrypted_map[row[0]]
+        score = get_password_score(pw) if pw else 0
+        
+        pw_strength = "weak"
+        if score > 4:
+            pw_strength = "strong"
+        elif score > 2:
+            pw_strength = "medium"
+            
+        if strength_filter and strength_filter != pw_strength:
+            continue
+            
+        age_info = get_age_status(row[3])
+        
+        if filter_type == "reused" and password_map.get(pw, 0) <= 1:
+            continue
+        if filter_type == "stale" and age_info["status"] != "warn":
+            continue
+        if filter_type == "overdue" and age_info["status"] != "critical":
+            continue
+            
+        passwords.append({
             "id":         row[0],
             "website":    row[1],
             "username":   row[2],
-            "age":        get_age_status(row[3]),
-        }
-        for row in rows
-    ]
+            "age":        age_info,
+            "strength":   pw_strength
+        })
 
     security_score, _, _, _, _, _ = calculate_security_score(session["user_id"])
 
@@ -514,7 +552,32 @@ def delete_password(id):
     conn.commit()
     conn.close()
 
+    flash("✅ Password deleted.", "success")
     return redirect("/dashboard")
+
+@app.route("/bulk-delete", methods=["POST"])
+def bulk_delete():
+    if "user_id" not in session:
+        return redirect("/")
+        
+    password_ids = request.form.getlist("password_ids")
+    if not password_ids:
+        flash("⚠️ No passwords selected.", "warning")
+        return redirect("/dashboard")
+        
+    conn = sqlite3.connect("database.db")
+    cursor = conn.cursor()
+    
+    # Securely delete multiple IDs
+    placeholders = ",".join(["?"] * len(password_ids))
+    params = password_ids + [session["user_id"]]
+    cursor.execute(f"DELETE FROM vault WHERE id IN ({placeholders}) AND user_id = ?", params)
+    
+    conn.commit()
+    conn.close()
+    
+    flash(f"✅ Successfully deleted {len(password_ids)} password(s).", "success")
+    return redirect(request.referrer or "/dashboard")
 
 
 @app.route("/edit-password/<int:id>", methods=["GET", "POST"])
@@ -874,6 +937,123 @@ def delete_account():
     flash("Your account has been permanently deleted.", "success")
     return redirect("/")
 
+
+@app.route("/export-vault")
+def export_vault():
+    if "user_id" not in session:
+        return redirect("/")
+        
+    fmt = request.args.get("format", "csv")
+    
+    conn = sqlite3.connect("database.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT website, site_username, site_password FROM vault WHERE user_id = ?", (session["user_id"],))
+    rows = cursor.fetchall()
+    conn.close()
+    
+    records = []
+    for row in rows:
+        records.append({
+            "website": row[0],
+            "username": row[1],
+            "password": decrypt_password(row[2])
+        })
+        
+    if fmt == "json":
+        json_data = json.dumps(records, indent=4)
+        return Response(
+            json_data,
+            mimetype="application/json",
+            headers={"Content-disposition": "attachment; filename=passify_vault.json"}
+        )
+    else:
+        # Default to CSV
+        si = io.StringIO()
+        cw = csv.DictWriter(si, fieldnames=["website", "username", "password"])
+        cw.writeheader()
+        cw.writerows(records)
+        return Response(
+            si.getvalue(),
+            mimetype="text/csv",
+            headers={"Content-disposition": "attachment; filename=passify_vault.csv"}
+        )
+
+@app.route("/import-vault", methods=["POST"])
+def import_vault():
+    if "user_id" not in session:
+        return redirect("/")
+        
+    if "import_file" not in request.files:
+        flash("❌ No file uploaded.", "error")
+        return redirect("/account-settings")
+        
+    file = request.files["import_file"]
+    if file.filename == "":
+        flash("❌ No file selected.", "error")
+        return redirect("/account-settings")
+        
+    content = file.read().decode("utf-8")
+    records = []
+    
+    def clean_website(url_str):
+        if not url_str:
+            return ""
+        if "://" in url_str:
+            parsed = urllib.parse.urlparse(url_str)
+            domain = parsed.netloc or parsed.path
+            return domain.replace("www.", "")
+        return url_str
+
+    try:
+        if file.filename.endswith(".json"):
+            data = json.loads(content)
+            for item in data:
+                website = item.get("website") or item.get("url") or item.get("uri") or item.get("name") or ""
+                username = item.get("username") or item.get("login") or item.get("login_username") or ""
+                password = item.get("password") or item.get("login_password") or ""
+                records.append({
+                    "website": clean_website(website),
+                    "username": username,
+                    "password": password
+                })
+        else:
+            # Assume CSV
+            reader = csv.DictReader(io.StringIO(content))
+            for row in reader:
+                # Lowercase all keys for easier matching
+                row_lower = {k.lower().strip() if k else "": v for k, v in row.items()}
+                website = row_lower.get("website") or row_lower.get("url") or row_lower.get("uri") or row_lower.get("name") or ""
+                username = row_lower.get("username") or row_lower.get("login") or row_lower.get("login_username") or ""
+                password = row_lower.get("password") or row_lower.get("login_password") or ""
+                
+                records.append({
+                    "website": clean_website(website),
+                    "username": username,
+                    "password": password
+                })
+                
+        conn = sqlite3.connect("database.db")
+        cursor = conn.cursor()
+        
+        imported_count = 0
+        for rec in records:
+            if rec["website"] and rec["password"]:
+                encrypted = encrypt_password(rec["password"])
+                cursor.execute(
+                    "INSERT INTO vault (website, site_username, site_password, user_id) VALUES (?, ?, ?, ?)",
+                    (rec["website"], rec["username"], encrypted, session["user_id"])
+                )
+                imported_count += 1
+                
+        conn.commit()
+        conn.close()
+        
+        flash(f"✅ Successfully imported {imported_count} passwords!", "success")
+        
+    except Exception as e:
+        flash(f"❌ Failed to parse file: {str(e)}", "error")
+        
+    return redirect("/account-settings")
 
 if __name__ == "__main__":
     app.run(debug=True)
