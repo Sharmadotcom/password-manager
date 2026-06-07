@@ -858,7 +858,11 @@ form input::placeholder{
 
     color:#d1d5db;
 }
-
+.password-grid{
+    display:flex;
+    flex-direction:column;
+    gap:20px;
+}
 input[type="range"]{
 
     width:100%;

@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS vault(
     user_id INTEGER NOT NULL
 )
 """)
+    
 
     conn.commit()
     conn.close()

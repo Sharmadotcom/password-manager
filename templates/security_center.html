@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Security Center | Passify</title>
+
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+
+</head>
+
+<body>
+
+<div id="content" style="display:flex;">
+
+    <aside class="sidebar">
+
+        <div class="logo">
+
+            <div class="logo-icon">
+                🔒
+            </div>
+
+            <span>
+                Passify
+            </span>
+
+        </div>
+
+        <nav>
+
+            <a href="/dashboard">
+                Dashboard
+            </a>
+
+            <a href="/add-password">
+                Add Password
+            </a>
+
+            <a class="active"
+               href="/security-center">
+                Security Center
+            </a>
+
+            <a href="/generate-password">
+                Generator
+            </a>
+
+            <a href="#">
+                Settings
+            </a>
+
+            <a href="/logout">
+                Logout
+            </a>
+
+        </nav>
+
+    </aside>
+
+    <main class="main">
+
+        <section class="hero">
+
+            <span class="hero-tag">
+                PASSIFY SECURITY
+            </span>
+
+            <h1>
+                Security.<br>
+                Analysis.
+            </h1>
+
+            <p>
+                Monitor your password health and
+                identify security weaknesses.
+            </p>
+
+        </section>
+
+        <section class="security-banner">
+
+            <div>
+
+                <h2>
+                    Overall Security Score
+                </h2>
+
+                <p>
+                    Based on password strength and password reuse.
+                </p>
+
+            </div>
+
+            <div class="score">
+                {{ security_score }}%
+            </div>
+
+        </section>
+
+        <section class="stats">
+
+            <div class="glass-card">
+
+                <h2>
+                    {{ total }}
+                </h2>
+
+                <span>
+                    Total Passwords
+                </span>
+
+            </div>
+
+            <div class="glass-card">
+
+                <h2>
+                    {{ strong }}
+                </h2>
+
+                <span>
+                    Strong Passwords
+                </span>
+
+            </div>
+
+            <div class="glass-card">
+
+                <h2>
+                    {{ medium }}
+                </h2>
+
+                <span>
+                    Medium Passwords
+                </span>
+
+            </div>
+
+            <div class="glass-card">
+
+                <h2>
+                    {{ weak }}
+                </h2>
+
+                <span>
+                    Weak Passwords
+                </span>
+
+            </div>
+
+            <div class="glass-card">
+
+                <h2>
+                    {{ reused_passwords }}
+                </h2>
+
+                <span>
+                    Reused Passwords
+                </span>
+
+            </div>
+
+        </section>
+
+        {% if weak > 0 or reused_passwords > 0 %}
+
+        <div class="security-banner">
+
+            <div>
+
+                <h2>
+                    ⚠ Security Findings
+                </h2>
+
+                <p>
+
+                    {% if weak > 0 %}
+                    • {{ weak }} weak password(s) detected.<br>
+                    {% endif %}
+
+                    {% if reused_passwords > 0 %}
+                    • {{ reused_passwords }} reused password(s) detected.<br>
+                    {% endif %}
+
+                    Review and update these credentials to improve security.
+
+                </p>
+
+            </div>
+
+        </div>
+
+        {% endif %}
+
+        <div class="security-banner">
+
+            <div>
+
+                <h2>
+                    💡 Security Tips
+                </h2>
+
+                <p>
+                    • Use unique passwords for every account<br>
+                    • Enable Two-Factor Authentication (2FA)<br>
+                    • Avoid reusing passwords across websites<br>
+                    • Use the built-in password generator<br>
+                    • Update weak passwords regularly
+                </p>
+
+            </div>
+
+        </div>
+
+    </main>
+
+</div>
+
+</body>
+
+</html>
