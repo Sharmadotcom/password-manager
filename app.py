@@ -1,4 +1,5 @@
 import os
+import secrets
 from datetime import datetime, timezone
 from password_generator import generate_password
 from crypto_utils import encrypt_password
@@ -33,7 +34,18 @@ from hibp import check_pwned
 init_db()
 app = Flask(__name__)
 app.secret_key = "super-secret-key"
+import secrets
 
+def generate_backup_codes():
+
+    codes = []
+
+    for _ in range(8):
+        codes.append(
+            secrets.token_hex(4).upper()
+        )
+
+    return codes
 
 def get_age_status(created_at_str: str) -> dict:
     """
@@ -300,7 +312,41 @@ def login():
 
     # GET request
     return render_template("login.html")
+@app.route("/backup-codes")
+def backup_codes():
 
+    if "user_id" not in session:
+        return redirect("/")
+
+    codes = session.get("backup_codes")
+
+    if not codes:
+
+        conn = sqlite3.connect("database.db")
+        cursor = conn.cursor()
+
+        cursor.execute(
+            """
+            SELECT backup_codes
+            FROM users
+            WHERE id = ?
+            """,
+            (session["user_id"],)
+        )
+
+        row = cursor.fetchone()
+
+        conn.close()
+
+        if row and row[0]:
+            codes = row[0].split(",")
+        else:
+            codes = []
+
+    return render_template(
+        "backup_codes.html",
+        codes=codes
+    )
 
 @app.route("/login-2fa", methods=["GET", "POST"])
 def login_2fa():
@@ -967,55 +1013,120 @@ def update_security_settings():
 
 @app.route("/setup-2fa", methods=["GET", "POST"])
 def setup_2fa():
+
     if "user_id" not in session:
         return redirect("/")
-    
+
     conn = sqlite3.connect("database.db")
     cursor = conn.cursor()
-    cursor.execute("SELECT email, two_factor_enabled FROM users WHERE id = ?", (session["user_id"],))
+
+    cursor.execute(
+        """
+        SELECT email, two_factor_enabled
+        FROM users
+        WHERE id = ?
+        """,
+        (session["user_id"],)
+    )
+
     user_row = cursor.fetchone()
+
     email = user_row[0] if user_row else "user@passify.local"
+
     if user_row and user_row[1] == 1:
         conn.close()
         flash("⚠️ 2FA is already enabled.", "warning")
         return redirect("/security-settings")
-    
+
     if request.method == "POST":
-        token = request.form.get("token", "").strip().replace(" ", "")
+
+        token = request.form.get(
+            "token",
+            ""
+        ).strip().replace(" ", "")
+
         secret = session.get("temp_2fa_secret")
-        
+
         if not secret:
-            conn.close()
-            return redirect("/setup-2fa")
-            
+            secret = pyotp.random_base32()
+            session["temp_2fa_secret"] = secret
+
         totp = pyotp.TOTP(secret)
+
         if totp.verify(token, valid_window=1):
-            cursor.execute("UPDATE users SET two_factor_enabled = 1, two_factor_secret = ? WHERE id = ?", (secret, session["user_id"]))
+
+            backup_codes = generate_backup_codes()
+
+            cursor.execute(
+                """
+                UPDATE users
+                SET
+                    two_factor_enabled = 1,
+                    two_factor_secret = ?,
+                    backup_codes = ?
+                WHERE id = ?
+                """,
+                (
+                    secret,
+                    ",".join(backup_codes),
+                    session["user_id"]
+                )
+            )
+
             conn.commit()
             conn.close()
+
+            session["backup_codes"] = backup_codes
             session.pop("temp_2fa_secret", None)
-            flash("✅ Two-Factor Authentication successfully enabled!", "success")
-            return redirect("/security-settings")
-        else:
-            conn.close()
-            flash("❌ Invalid code. Try again.", "error")
-            return redirect("/setup-2fa")
-            
-    # GET: Generate new secret and QR code if not exists
+
+            flash(
+                "✅ Two-Factor Authentication successfully enabled!",
+                "success"
+            )
+
+            return redirect("/backup-codes")
+
+        conn.close()
+
+        flash(
+            "❌ Invalid code. Try again.",
+            "error"
+        )
+
+        return redirect("/setup-2fa")
+
+    # GET REQUEST
+
     secret = session.get("temp_2fa_secret")
+
     if not secret:
         secret = pyotp.random_base32()
         session["temp_2fa_secret"] = secret
-    
-    totp_uri = pyotp.totp.TOTP(secret).provisioning_uri(name=email, issuer_name="Passify")
-    
+
+    totp_uri = pyotp.TOTP(secret).provisioning_uri(
+        name=email,
+        issuer_name="Passify"
+    )
+
     img = qrcode.make(totp_uri)
+
     stream = io.BytesIO()
     img.save(stream, format="PNG")
-    qr_b64 = "data:image/png;base64," + base64.b64encode(stream.getvalue()).decode('utf-8')
+
+    qr_b64 = (
+        "data:image/png;base64,"
+        + base64.b64encode(
+            stream.getvalue()
+        ).decode("utf-8")
+    )
+
     conn.close()
-    
-    return render_template("setup_2fa.html", qr_b64=qr_b64, secret=secret)
+
+    return render_template(
+        "setup_2fa.html",
+        qr_b64=qr_b64,
+        secret=secret
+    )
 
 
 @app.route("/api/unlock-password/<int:vault_id>", methods=["POST"])

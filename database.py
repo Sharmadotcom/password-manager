@@ -78,7 +78,10 @@ CREATE TABLE IF NOT EXISTS vault(
         cursor.execute(
         "ALTER TABLE users ADD COLUMN reuse_alerts INTEGER DEFAULT 1"
     )
-
+    if "backup_codes" not in user_cols:
+        cursor.execute(
+        "ALTER TABLE users ADD COLUMN backup_codes TEXT DEFAULT ''"
+    )
     if "weak_alerts" not in user_cols:
         cursor.execute(
         "ALTER TABLE users ADD COLUMN weak_alerts INTEGER DEFAULT 1"
@@ -93,6 +96,6 @@ CREATE TABLE IF NOT EXISTS vault(
         cursor.execute(
         "ALTER TABLE users ADD COLUMN auto_logout INTEGER DEFAULT 30"
     )
-
+    
     conn.commit()
     conn.close()

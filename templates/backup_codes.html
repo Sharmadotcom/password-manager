@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Backup Codes | Passify</title>
+
+    <style>
+
+        body{
+            background:#050816;
+            color:white;
+            font-family:Arial,sans-serif;
+            padding:40px;
+        }
+
+        .container{
+            max-width:800px;
+            margin:auto;
+        }
+
+        .card{
+            background:#111827;
+            border:1px solid rgba(255,255,255,.08);
+            border-radius:16px;
+            padding:30px;
+        }
+
+        h1{
+            margin-bottom:10px;
+        }
+
+        p{
+            color:#9ca3af;
+        }
+
+        .codes{
+            display:grid;
+            grid-template-columns:repeat(2,1fr);
+            gap:12px;
+            margin-top:20px;
+        }
+
+        .code{
+            background:#1f2937;
+            padding:14px;
+            border-radius:10px;
+            font-weight:bold;
+            text-align:center;
+            letter-spacing:2px;
+        }
+
+        .btn{
+            display:inline-block;
+            margin-top:25px;
+            padding:12px 20px;
+            background:#6366f1;
+            color:white;
+            text-decoration:none;
+            border-radius:10px;
+        }
+
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <div class="card">
+
+        <h1>🔐 Backup Codes</h1>
+
+        <p>
+            Save these codes somewhere safe.
+            Each backup code can be used once if
+            you lose access to your authenticator app.
+        </p>
+
+        <div class="codes">
+
+            {% for code in codes %}
+                <div class="code">
+                    {{ code }}
+                </div>
+            {% endfor %}
+
+        </div>
+
+        <a
+            href="/security-settings"
+            class="btn"
+        >
+            Continue
+        </a>
+
+    </div>
+
+</div>
+
+</body>
+</html>
