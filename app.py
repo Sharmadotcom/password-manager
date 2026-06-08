@@ -746,33 +746,200 @@ def account_settings():
 
     return render_template("account_settings.html", email=email, password_count=total)
 
+@app.before_request
+def check_auto_logout():
 
-@app.route("/security-settings", methods=["GET"])
-def security_settings():
     if "user_id" not in session:
-        return redirect("/")
-    
+        return
+
     conn = sqlite3.connect("database.db")
     cursor = conn.cursor()
+
     cursor.execute(
-        "SELECT two_factor_enabled, strict_mode, login_alerts FROM users WHERE id = ?",
+        """
+        SELECT auto_logout
+        FROM users
+        WHERE id = ?
+        """,
         (session["user_id"],)
     )
-    row = cursor.fetchone()
+
+    timeout = cursor.fetchone()[0]
+
     conn.close()
 
-    two_factor_enabled = bool(row[0]) if row else False
-    strict_mode = bool(row[1]) if row else False
-    login_alerts = bool(row[2]) if row else False
+    if timeout == 0:
+        return
 
-    return render_template(
-        "security_settings.html",
-        two_factor_enabled=two_factor_enabled,
-        strict_mode=strict_mode,
-        login_alerts=login_alerts
+    now = datetime.now().timestamp()
+
+    last_activity = session.get(
+        "last_activity",
+        now
     )
 
+    if now - last_activity > timeout * 60:
+        session.clear()
+        return redirect("/")
 
+    session["last_activity"] = now
+@app.route("/security-settings", methods=["GET"])
+def security_settings():
+
+    if "user_id" not in session:
+        return redirect("/")
+
+    conn = sqlite3.connect("database.db")
+    cursor = conn.cursor()
+
+    cursor.execute(
+    """
+    SELECT
+        two_factor_enabled,
+        strict_mode,
+        login_alerts,
+        theme,
+        auto_logout
+    FROM users
+    WHERE id = ?
+    """,
+    (session["user_id"],)
+)
+
+    row = cursor.fetchone()
+
+    two_factor_enabled = bool(row[0])
+    strict_mode = bool(row[1])
+    login_alerts = bool(row[2])
+    auto_logout = row[3]
+    theme = row[3]
+
+    return render_template(
+    "security_settings.html",
+    two_factor_enabled=two_factor_enabled,
+    strict_mode=strict_mode,
+    login_alerts=login_alerts,
+    auto_logout=auto_logout
+)
+@app.route("/update-theme", methods=["POST"])
+def update_theme():
+
+    if "user_id" not in session:
+        return {"success": False}
+
+    theme = request.json.get("theme")
+
+    conn = sqlite3.connect("database.db")
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        UPDATE users
+        SET theme = ?
+        WHERE id = ?
+        """,
+        (theme, session["user_id"])
+    )
+
+    conn.commit()
+    conn.close()
+
+    return {"success": True}
+@app.context_processor
+def inject_theme():
+
+    if "user_id" not in session:
+        return {"theme": "dark"}
+
+    conn = sqlite3.connect("database.db")
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        SELECT theme
+        FROM users
+        WHERE id = ?
+        """,
+        (session["user_id"],)
+    )
+
+    row = cursor.fetchone()
+
+    conn.close()
+
+    return {
+        "theme": row[0] if row else "dark"
+    }
+@app.route("/update-auto-logout", methods=["POST"])
+def update_auto_logout():
+
+    if "user_id" not in session:
+        return {"success": False}
+
+    minutes = request.json.get("minutes")
+
+    conn = sqlite3.connect("database.db")
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        UPDATE users
+        SET auto_logout = ?
+        WHERE id = ?
+        """,
+        (minutes, session["user_id"])
+    )
+
+    conn.commit()
+    conn.close()
+
+    return {"success": True}
+@app.before_request
+def check_session_timeout():
+
+    if "user_id" not in session:
+        return
+
+    conn = sqlite3.connect("database.db")
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        SELECT auto_logout
+        FROM users
+        WHERE id = ?
+        """,
+        (session["user_id"],)
+    )
+
+    result = cursor.fetchone()
+
+    conn.close()
+
+    timeout = result[0] if result else 30
+
+    print("TIMEOUT =", timeout)
+
+    if timeout == 0:
+        return
+
+    now = datetime.now().timestamp()
+
+    last_activity = session.get(
+        "last_activity",
+        now
+    )
+
+    print("NOW =", now)
+    print("LAST =", last_activity)
+    print("DIFF =", now - last_activity)
+
+    if now - last_activity > timeout * 60:
+        print("LOGGING OUT")
+        session.clear()
+        return redirect("/")
+
+    session["last_activity"] = now
 @app.route("/update-security-settings", methods=["POST"])
 def update_security_settings():
     if "user_id" not in session:

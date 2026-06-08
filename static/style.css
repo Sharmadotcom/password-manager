@@ -10,6 +10,10 @@
 html{
     scroll-behavior:smooth;
 }
+body.dark {
+    background: #050816;
+    color: white;
+}
 
 body{
     min-height:100vh;

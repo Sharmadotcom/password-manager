@@ -69,6 +69,30 @@ CREATE TABLE IF NOT EXISTS vault(
             WHERE last_updated IS NULL
             """
         )
+    if "theme" not in user_cols:
+        cursor.execute(
+        "ALTER TABLE users ADD COLUMN theme TEXT DEFAULT 'dark'"
+    )
+
+    if "reuse_alerts" not in user_cols:
+        cursor.execute(
+        "ALTER TABLE users ADD COLUMN reuse_alerts INTEGER DEFAULT 1"
+    )
+
+    if "weak_alerts" not in user_cols:
+        cursor.execute(
+        "ALTER TABLE users ADD COLUMN weak_alerts INTEGER DEFAULT 1"
+    )
+
+    if "breach_alerts" not in user_cols:
+        cursor.execute(
+        "ALTER TABLE users ADD COLUMN breach_alerts INTEGER DEFAULT 1"
+    )
+
+    if "auto_logout" not in user_cols:
+        cursor.execute(
+        "ALTER TABLE users ADD COLUMN auto_logout INTEGER DEFAULT 30"
+    )
 
     conn.commit()
     conn.close()
