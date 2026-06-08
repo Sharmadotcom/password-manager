@@ -813,7 +813,9 @@ def check_auto_logout():
         (session["user_id"],)
     )
 
-    timeout = cursor.fetchone()[0]
+    result = cursor.fetchone()
+
+    timeout = result[0] if result else 30
 
     conn.close()
 
