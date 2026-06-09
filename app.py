@@ -1,7 +1,9 @@
 import os
 import secrets
+from flask import g
 from datetime import datetime, timezone
 from password_generator import generate_password
+from db import get_db
 from crypto_utils import encrypt_password
 from crypto_utils import decrypt_password
 from flask import (
@@ -14,7 +16,6 @@ from flask import (
     flash,
     Response
 )
-import sqlite3
 from werkzeug.security import (
     generate_password_hash,
     check_password_hash
@@ -101,10 +102,10 @@ def get_password_score(password):
 
 
 def calculate_security_score(user_id):
-    conn = sqlite3.connect("database.db")
+    conn = get_db()
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT site_password FROM vault WHERE user_id = ?",
+        "SELECT site_password FROM vault WHERE user_id = %s",
         (user_id,)
     )
     records = cursor.fetchall()
@@ -156,10 +157,10 @@ def get_recommendations(user_id: int) -> list:
         title     — short headline
         detail    — explanation (may include a count)
     """
-    conn = sqlite3.connect("database.db")
+    conn = get_db()
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT site_password, created_at FROM vault WHERE user_id = ?",
+        "SELECT site_password, created_at FROM vault WHERE user_id = %s",
         (user_id,)
     )
     rows = cursor.fetchall()
@@ -289,11 +290,11 @@ def login():
         username = request.form["username"]
         password = request.form["password"]
 
-        conn = sqlite3.connect("database.db")
+        conn = get_db()
         cursor = conn.cursor()
 
         cursor.execute(
-            "SELECT id, username, password_hash, two_factor_enabled FROM users WHERE username = ?",
+            "SELECT id, username, password_hash, two_factor_enabled FROM users WHERE username = %s",
             (username,)
         )
 
@@ -325,14 +326,14 @@ def backup_codes():
 
     if not codes:
 
-        conn = sqlite3.connect("database.db")
+        conn = get_db()
         cursor = conn.cursor()
 
         cursor.execute(
             """
             SELECT backup_codes
             FROM users
-            WHERE id = ?
+            WHERE id = %s
             """,
             (session["user_id"],)
         )
@@ -350,7 +351,13 @@ def backup_codes():
         "backup_codes.html",
         codes=codes
     )
+@app.teardown_appcontext
+def close_db(error=None):
 
+    db = g.pop("db", None)
+
+    if db is not None:
+        db.close()
 @app.route("/login-2fa", methods=["GET", "POST"])
 def login_2fa():
     if "pre_2fa_user_id" not in session:
@@ -358,10 +365,10 @@ def login_2fa():
 
     if request.method == "POST":
         token = request.form.get("token", "").strip().replace(" ", "")
-        conn = sqlite3.connect("database.db")
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute(
-            "SELECT two_factor_secret FROM users WHERE id = ?",
+            "SELECT two_factor_secret FROM users WHERE id = %s",
             (session["pre_2fa_user_id"],)
         )
         row = cursor.fetchone()
@@ -390,7 +397,7 @@ def register():
 
         password_hash = generate_password_hash(password)
 
-        conn = sqlite3.connect("database.db")
+        conn = get_db()
         cursor = conn.cursor()
 
         try:
@@ -399,7 +406,7 @@ def register():
                 """
                 INSERT INTO users
                 (username, password_hash)
-                VALUES (?, ?)
+                VALUES (%s, %s)
                 """,
                 (username, password_hash)
             )
@@ -409,7 +416,7 @@ def register():
 
             return redirect("/")
 
-        except sqlite3.IntegrityError:
+        except Exception:
 
             conn.close()
             flash("❌ That username is already taken. Please choose another.", "error")
@@ -421,7 +428,7 @@ def dashboard():
     if "user_id" not in session:
         return redirect("/")
 
-    conn = sqlite3.connect("database.db")
+    conn = get_db()
     cursor = conn.cursor()
     search = request.args.get("search", "")
     strength_filter = request.args.get("strength", "")
@@ -432,7 +439,7 @@ def dashboard():
             """
             SELECT id, website, site_username, created_at, site_password
             FROM vault
-            WHERE user_id = ? AND website LIKE ?
+            WHERE user_id = %s AND website LIKE ?
             """,
             (session["user_id"], f"%{search}%")
         )
@@ -441,7 +448,7 @@ def dashboard():
             """
             SELECT id, website, site_username, created_at, site_password
             FROM vault
-            WHERE user_id = ?
+            WHERE user_id = %s
             """,
             (session["user_id"],)
         )
@@ -502,17 +509,17 @@ def view_password(id):
     if "user_id" not in session:
         return redirect("/")
 
-    conn = sqlite3.connect("database.db")
+    conn = get_db()
     cursor = conn.cursor()
     cursor.execute(
         """
         SELECT website, site_username, site_password
-        FROM vault WHERE id = ? AND user_id = ?
+        FROM vault WHERE id = %s AND user_id = %s
         """,
         (id, session["user_id"])
     )
     record = cursor.fetchone()
-    cursor.execute("SELECT strict_mode FROM users WHERE id = ?", (session["user_id"],))
+    cursor.execute("SELECT strict_mode FROM users WHERE id = %s", (session["user_id"],))
     user_row = cursor.fetchone()
     strict_mode = bool(user_row[0]) if user_row else False
     
@@ -559,10 +566,10 @@ def security_center():
     )
 
     # ── Age / expiry counts ──────────────────────────────────
-    conn = sqlite3.connect("database.db")
+    conn = get_db()
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT created_at FROM vault WHERE user_id = ?",
+        "SELECT created_at FROM vault WHERE user_id = %s",
         (session["user_id"],)
     )
     age_rows = cursor.fetchall()
@@ -592,10 +599,10 @@ def delete_password(id):
     if "user_id" not in session:
         return redirect("/")
 
-    conn = sqlite3.connect("database.db")
+    conn = get_db()
     cursor = conn.cursor()
     cursor.execute(
-        "DELETE FROM vault WHERE id = ? AND user_id = ?",
+        "DELETE FROM vault WHERE id = %s AND user_id = %s",
         (id, session["user_id"])
     )
     conn.commit()
@@ -614,13 +621,13 @@ def bulk_delete():
         flash("⚠️ No passwords selected.", "warning")
         return redirect("/dashboard")
         
-    conn = sqlite3.connect("database.db")
+    conn = get_db()
     cursor = conn.cursor()
     
     # Securely delete multiple IDs
     placeholders = ",".join(["?"] * len(password_ids))
     params = password_ids + [session["user_id"]]
-    cursor.execute(f"DELETE FROM vault WHERE id IN ({placeholders}) AND user_id = ?", params)
+    cursor.execute(f"DELETE FROM vault WHERE id IN ({placeholders}) AND user_id = %s", params)
     
     conn.commit()
     conn.close()
@@ -634,7 +641,7 @@ def edit_password(id):
     if "user_id" not in session:
         return redirect("/")
 
-    conn = sqlite3.connect("database.db")
+    conn = get_db()
     cursor = conn.cursor()
 
     if request.method == "POST":
@@ -647,10 +654,12 @@ def edit_password(id):
         cursor.execute(
             """
             UPDATE vault
-            SET website = ?,
-    site_username = ?,
-    site_password = ?,
-    last_updated = ?
+SET website = %s,
+    site_username = %s,
+    site_password = %s,
+    last_updated = %s
+WHERE id = %s
+AND user_id = %s
             """,
             (website, site_username, encrypted_password, id, session["user_id"])
         )
@@ -660,7 +669,7 @@ def edit_password(id):
         return redirect("/dashboard")
 
     cursor.execute(
-        "SELECT website, site_username FROM vault WHERE id = ? AND user_id = ?",
+        "SELECT website, site_username FROM vault WHERE id = %s AND user_id = %s",
         (id, session["user_id"])
     )
     record = cursor.fetchone()
@@ -681,7 +690,7 @@ def add_password():
         last_updated = datetime.now().strftime("%Y-%m-%d")
         encrypted_password = encrypt_password(site_password)
 
-        conn = sqlite3.connect("database.db")
+        conn = get_db()
         cursor = conn.cursor()
         cursor.execute(
     """
@@ -693,7 +702,7 @@ def add_password():
         user_id,
         last_updated
     )
-    VALUES (?, ?, ?, ?, ?)
+    VALUES (%s, %s, %s, %s, %s)
     """,
     (
         website,
@@ -730,12 +739,12 @@ def profile():
     if "user_id" not in session:
         return redirect("/")
 
-    conn = sqlite3.connect("database.db")
+    conn = get_db()
     cursor = conn.cursor()
 
     # GET — fetch user info and stats
     cursor.execute(
-        "SELECT username, email, created_at FROM users WHERE id = ?",
+        "SELECT username, email, created_at FROM users WHERE id = %s",
         (session["user_id"],)
     )
     user = cursor.fetchone()
@@ -768,13 +777,13 @@ def account_settings():
     if "user_id" not in session:
         return redirect("/")
 
-    conn = sqlite3.connect("database.db")
+    conn = get_db()
     cursor = conn.cursor()
 
     if request.method == "POST":
         email = request.form.get("email", "").strip()
         cursor.execute(
-            "UPDATE users SET email = ? WHERE id = ?",
+            "UPDATE users SET email = %s WHERE id = %s",
             (email, session["user_id"])
         )
         conn.commit()
@@ -783,7 +792,7 @@ def account_settings():
         return redirect("/account-settings")
 
     cursor.execute(
-        "SELECT email FROM users WHERE id = ?",
+        "SELECT email FROM users WHERE id = %s",
         (session["user_id"],)
     )
     row = cursor.fetchone()
@@ -801,17 +810,17 @@ def check_auto_logout():
     if "user_id" not in session:
         return
 
-    conn = sqlite3.connect("database.db")
+    conn = get_db()
     cursor = conn.cursor()
 
     cursor.execute(
-        """
-        SELECT auto_logout
-        FROM users
-        WHERE id = ?
-        """,
-        (session["user_id"],)
-    )
+    """
+    SELECT auto_logout
+    FROM users
+    WHERE id = %s
+    """,
+    (session["user_id"],)
+)
 
     result = cursor.fetchone()
 
@@ -840,7 +849,7 @@ def security_settings():
     if "user_id" not in session:
         return redirect("/")
 
-    conn = sqlite3.connect("database.db")
+    conn = get_db()
     cursor = conn.cursor()
 
     cursor.execute(
@@ -852,7 +861,7 @@ def security_settings():
         theme,
         auto_logout
     FROM users
-    WHERE id = ?
+    WHERE id = %s
     """,
     (session["user_id"],)
 )
@@ -880,14 +889,14 @@ def update_theme():
 
     theme = request.json.get("theme")
 
-    conn = sqlite3.connect("database.db")
+    conn = get_db()
     cursor = conn.cursor()
 
     cursor.execute(
         """
         UPDATE users
-        SET theme = ?
-        WHERE id = ?
+        SET theme = %s
+        WHERE id = %s
         """,
         (theme, session["user_id"])
     )
@@ -902,17 +911,17 @@ def inject_theme():
     if "user_id" not in session:
         return {"theme": "dark"}
 
-    conn = sqlite3.connect("database.db")
+    conn = get_db()
     cursor = conn.cursor()
 
     cursor.execute(
-        """
-        SELECT theme
-        FROM users
-        WHERE id = ?
-        """,
-        (session["user_id"],)
-    )
+    """
+    SELECT theme
+    FROM users
+    WHERE id = %s
+    """,
+    (session["user_id"],)
+)
 
     row = cursor.fetchone()
 
@@ -929,14 +938,14 @@ def update_auto_logout():
 
     minutes = request.json.get("minutes")
 
-    conn = sqlite3.connect("database.db")
+    conn = get_db()
     cursor = conn.cursor()
 
     cursor.execute(
         """
         UPDATE users
-        SET auto_logout = ?
-        WHERE id = ?
+        SET auto_logout = %s
+        WHERE id = %s
         """,
         (minutes, session["user_id"])
     )
@@ -951,14 +960,14 @@ def check_session_timeout():
     if "user_id" not in session:
         return
 
-    conn = sqlite3.connect("database.db")
+    conn = get_db()
     cursor = conn.cursor()
 
     cursor.execute(
         """
         SELECT auto_logout
         FROM users
-        WHERE id = ?
+        WHERE id = %s
         """,
         (session["user_id"],)
     )
@@ -999,15 +1008,15 @@ def update_security_settings():
     setting = request.form.get("setting")
     value = request.form.get("value")
     
-    conn = sqlite3.connect("database.db")
+    conn = get_db()
     cursor = conn.cursor()
     
     if setting == "strict_mode":
-        cursor.execute("UPDATE users SET strict_mode = ? WHERE id = ?", (1 if value == "true" else 0, session["user_id"]))
+        cursor.execute("UPDATE users SET strict_mode = %s WHERE id = %s", (1 if value == "true" else 0, session["user_id"]))
     elif setting == "login_alerts":
-        cursor.execute("UPDATE users SET login_alerts = ? WHERE id = ?", (1 if value == "true" else 0, session["user_id"]))
+        cursor.execute("UPDATE users SET login_alerts = %s WHERE id = %s", (1 if value == "true" else 0, session["user_id"]))
     elif setting == "disable_2fa":
-        cursor.execute("UPDATE users SET two_factor_enabled = 0, two_factor_secret = '' WHERE id = ?", (session["user_id"],))
+        cursor.execute("UPDATE users SET two_factor_enabled = 0, two_factor_secret = '' WHERE id = %s", (session["user_id"],))
         flash("✅ Two-Factor Authentication disabled.", "success")
         
     conn.commit()
@@ -1022,14 +1031,14 @@ def setup_2fa():
     if "user_id" not in session:
         return redirect("/")
 
-    conn = sqlite3.connect("database.db")
+    conn = get_db()
     cursor = conn.cursor()
 
     cursor.execute(
         """
         SELECT email, two_factor_enabled
         FROM users
-        WHERE id = ?
+        WHERE id = %s
         """,
         (session["user_id"],)
     )
@@ -1067,9 +1076,9 @@ def setup_2fa():
                 UPDATE users
                 SET
                     two_factor_enabled = 1,
-                    two_factor_secret = ?,
-                    backup_codes = ?
-                WHERE id = ?
+                    two_factor_secret = %s,
+                    backup_codes = %s
+                WHERE id = %s
                 """,
                 (
                     secret,
@@ -1141,16 +1150,16 @@ def unlock_password(vault_id):
         
     master_password = request.form.get("master_password", "")
     
-    conn = sqlite3.connect("database.db")
+    conn = get_db()
     cursor = conn.cursor()
     
-    cursor.execute("SELECT password_hash FROM users WHERE id = ?", (session["user_id"],))
+    cursor.execute("SELECT password_hash FROM users WHERE id = %s", (session["user_id"],))
     user_row = cursor.fetchone()
     if not user_row or not check_password_hash(user_row[0], master_password):
         conn.close()
         return "Incorrect Master Password", 403
         
-    cursor.execute("SELECT site_password FROM vault WHERE id = ? AND user_id = ?", (vault_id, session["user_id"]))
+    cursor.execute("SELECT site_password FROM vault WHERE id = %s AND user_id = %s", (vault_id, session["user_id"]))
     vault_row = cursor.fetchone()
     conn.close()
     
@@ -1171,10 +1180,10 @@ def change_password():
     confirm = request.form.get("confirm_password", "")
 
     # Fetch current hash
-    conn = sqlite3.connect("database.db")
+    conn = get_db()
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT password_hash FROM users WHERE id = ?",
+        "SELECT password_hash FROM users WHERE id = %s",
         (session["user_id"],)
     )
     row = cursor.fetchone()
@@ -1201,7 +1210,7 @@ def change_password():
 
     new_hash = generate_password_hash(new_pw)
     cursor.execute(
-        "UPDATE users SET password_hash = ? WHERE id = ?",
+        "UPDATE users SET password_hash = %s WHERE id = %s",
         (new_hash, session["user_id"])
     )
     conn.commit()
@@ -1224,10 +1233,10 @@ def delete_account():
 
     user_id = session["user_id"]
 
-    conn = sqlite3.connect("database.db")
+    conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM vault WHERE user_id = ?", (user_id,))
-    cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    cursor.execute("DELETE FROM vault WHERE user_id = %s", (user_id,))
+    cursor.execute("DELETE FROM users WHERE id = %s", (user_id,))
     conn.commit()
     conn.close()
 
@@ -1243,9 +1252,9 @@ def export_vault():
         
     fmt = request.args.get("format", "csv")
     
-    conn = sqlite3.connect("database.db")
+    conn = get_db()
     cursor = conn.cursor()
-    cursor.execute("SELECT website, site_username, site_password FROM vault WHERE user_id = ?", (session["user_id"],))
+    cursor.execute("SELECT website, site_username, site_password FROM vault WHERE user_id = %s", (session["user_id"],))
     rows = cursor.fetchall()
     conn.close()
     
@@ -1330,7 +1339,7 @@ def import_vault():
                     "password": password
                 })
                 
-        conn = sqlite3.connect("database.db")
+        conn = get_db()
         cursor = conn.cursor()
         
         imported_count = 0
@@ -1338,7 +1347,7 @@ def import_vault():
             if rec["website"] and rec["password"]:
                 encrypted = encrypt_password(rec["password"])
                 cursor.execute(
-                    "INSERT INTO vault (website, site_username, site_password, user_id) VALUES (?, ?, ?, ?)",
+                    "INSERT INTO vault (website, site_username, site_password, user_id) VALUES (%s, %s, %s, %s)",
                     (rec["website"], rec["username"], encrypted, session["user_id"])
                 )
                 imported_count += 1

@@ -1,4 +1,5 @@
 import os
+import time
 import psycopg
 from dotenv import load_dotenv
 
@@ -10,4 +11,18 @@ if not DATABASE_URL:
     raise ValueError("DATABASE_URL not found")
 
 def get_db():
-    return psycopg.connect(DATABASE_URL)
+
+    start = time.time()
+
+    conn = psycopg.connect(
+        DATABASE_URL,
+        sslmode="require"
+    )
+
+    print(
+        "Connection took:",
+        round(time.time() - start, 2),
+        "seconds"
+    )
+
+    return conn
