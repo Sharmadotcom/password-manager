@@ -237,10 +237,7 @@
                         <p style="color:#9ca3af; font-size:.875rem; margin:0;">Get notified of logins from new devices.</p>
                     </div>
                 <div class="setting-item">
-    <div>
-        <h3>Auto Logout</h3>
-        <p>Automatically log out after inactivity.</p>
-    </div>
+    
 
     <select id="autoLogout">
         <option value="5" {% if auto_logout == 5 %}selected{% endif %}>
@@ -270,7 +267,10 @@
         <h3>Theme</h3>
         <p>Choose your appearance mode.</p>
     </div>
-
+<div>
+        <h3>Auto Logout</h3>
+        <p>Automatically log out after inactivity.</p>
+    </div>
     <select id="themeSelect">
         <option value="dark"
             {% if theme == "dark" %}selected{% endif %}>
